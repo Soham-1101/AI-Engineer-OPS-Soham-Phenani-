@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickMove | Dispatcher</title>
+    
+    <!-- Distinctive Typography: Syne (Headings) and Sora (Body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=Syne:wght@500;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            color-scheme: dark;
+            
+            /* Atmospheric Color Palette */
+            --bg-base: #0B0C10;
+            --accent-primary: #FF4A3F;
+            --accent-glow: rgba(255, 74, 63, 0.4);
+            --surface-glass: rgba(20, 22, 30, 0.6);
+            --surface-hover: rgba(35, 38, 50, 0.8);
+            --text-title: #FFFFFF;
+            --text-body: #A0A5B5;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-focus: #FF4A3F;
+        }
+
+        /* SVG Noise Texture */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* Atmospheric Gradient Orbs */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.5;
+            z-index: -1;
+            animation: float 20s ease-in-out infinite alternate;
+        }
+        .orb-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: radial-gradient(circle, #2A1B38, transparent 70%); }
+        .orb-2 { bottom: -20%; right: -10%; width: 60vw; height: 60vw; background: radial-gradient(circle, #381515, transparent 70%); animation-delay: -5s; }
+        .orb-3 { top: 30%; left: 40%; width: 30vw; height: 30vw; background: radial-gradient(circle, #102538, transparent 70%); animation-delay: -10s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(5%, 10%) scale(1.1); }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Sora', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-body);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            selection-background: var(--accent-primary);
+            selection-color: #fff;
+        }
+
+        /* Layout & Composition */
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Glassmorphic Sidebar */
+        .sidebar {
+            background: var(--surface-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border-subtle);
+            padding: 40px 32px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .brand-header {
+            margin-bottom: 48px;
+            position: relative;
+        }
+        .brand-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--text-title);
+            letter-spacing: -1px;
+            line-height: 1;
+        }
+        .brand-subtitle {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--accent-primary);
+            font-weight: 600;
+            margin-top: 8px;
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 32px;
+            animation: fadeUp 0.6s ease forwards;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        .form-group:nth-child(2) { animation-delay: 0.1s; }
+        .form-group:nth-child(3) { animation-delay: 0.2s; }
+        .form-group:nth-child(4) { animation-delay: 0.3s; }
+        .form-group:nth-child(5) { animation-delay: 0.4s; }
+
+        @keyframes fadeUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-title);
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Custom Inputs */
+        input[type="text"], select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-title);
+            padding: 14px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            outline: none;
+            appearance: none;
+        }
+        select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+        }
+        input[type="text"]:focus-visible, select:focus-visible {
+            border-color: var(--border-focus);
+            background: rgba(255, 255, 255, 0.06);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        /* Fix for native dropdown options (white text on white background issue) */
+        option {
+            background-color: var(--bg-base);
+            color: var(--text-title);
+        }
+        
+        /* Interactive Chips */
+        .chip-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .chip {
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-body);
+            padding: 10px 16px;
+            border-radius: 40px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            user-select: none;
+        }
+        .chip:hover {
+            border-color: rgba(255,255,255,0.3);
+            color: var(--text-title);
+        }
+        .chip.active {
+            background: var(--text-title);
+            color: var(--bg-base);
+            border-color: var(--text-title);
+            font-weight: 600;
+        }
+        .chip:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px var(--accent-glow);
+            border-color: var(--border-focus);
+        }
+
+        /* Action Button */
+        .dispatch-btn {
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            padding: 18px;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: auto;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            outline: none;
+        }
+        .dispatch-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: 0.5s;
+        }
+        .dispatch-btn:hover::before {
+            left: 100%;
+        }
+        .dispatch-btn:hover {
+            background: #FF5A50;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 74, 63, 0.2);
+        }
+        .dispatch-btn:focus-visible {
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.5), 0 10px 20px rgba(255, 74, 63, 0.2);
+        }
+
+        /* Main Workspace */
+        .workspace {
+            padding: 60px 80px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .workspace-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 42px;
+            font-weight: 700;
+            color: var(--text-title);
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+
+        /* Empty State */
+        .empty-canvas {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            max-width: 500px;
+        }
+        .empty-line {
+            height: 1px;
+            width: 60px;
+            background: var(--accent-primary);
+            margin-bottom: 24px;
+        }
+        .empty-text {
+            font-size: 20px;
+            line-height: 1.6;
+            font-weight: 300;
+        }
+
+        /* Results Grid */
+        #results {
+            display: none;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 24px;
+        }
+
+        /* Architectural Card Design */
+        .match-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            animation: slideIn 0.5s forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        .match-card:hover {
+            background: rgba(255,255,255,0.04);
+            border-color: rgba(255,255,255,0.15);
+            transform: translateY(-4px);
+        }
+
+        @keyframes slideIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .mc-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .mc-rank {
+            position: absolute;
+            top: 0; right: 0;
+            background: var(--accent-primary);
+            color: white;
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 14px;
+            padding: 6px 12px;
+            border-bottom-left-radius: 8px;
+        }
+        .mc-name {
+            font-family: 'Syne', sans-serif;
+            font-size: 20px;
+            color: var(--text-title);
+            margin-bottom: 12px;
+        }
+        .mc-metrics {
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+        }
+        .metric {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .metric-val {
+            font-size: 16px;
+            font-weight: 600;
+            color: #E2E8F0;
+        }
+        .metric-val.highlight {
+            color: #10B981;
+        }
+
+        .mc-body {
+            padding: 24px;
+            background: rgba(0,0,0,0.2);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .mc-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-body);
+            margin-bottom: 12px;
+        }
+        .mc-message {
+            font-family: 'Inter', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #CBD5E1;
+            white-space: pre-wrap;
+            margin-bottom: 24px;
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-title);
+            padding: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            margin-top: auto;
+            text-align: center;
+            outline: none;
+        }
+        .copy-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .copy-btn:focus-visible {
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--text-title);
+            color: var(--bg-base);
+            padding: 14px 24px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 13px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .toast.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+    </style>
+</head>
+<body>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <main class="layout-grid">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand-header">
+                <h1 class="brand-title">QuickMove</h1>
+                <span class="brand-subtitle">Dispatcher Intelligence</span>
+            </div>
+
+            <div class="form-group">
+                <label for="city-select">Destination City</label>
+                <select id="city-select">
+                    <option value="" disabled selected>Select regional market&hellip;</option>
+                    <option value="Bengaluru">Bengaluru</option>
+                    <option value="Pune">Pune</option>
+                    <option value="Mumbai">Mumbai</option>
+                    <option value="Delhi NCR">Delhi NCR</option>
+                    <option value="Hyderabad">Hyderabad</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Structural Configuration</label>
+                <div class="chip-group" id="config-group" role="radiogroup">
+                    <button class="chip active" role="radio" aria-checked="true" data-val="1BHK">1BHK</button>
+                    <button class="chip" role="radio" aria-checked="false" data-val="2BHK">2BHK</button>
+                    <button class="chip" role="radio" aria-checked="false" data-val="3BHK">3BHK</button>
+                    <button class="chip" role="radio" aria-checked="false" data-val="4BHK+">4BHK+</button>
+                    <button class="chip" role="radio" aria-checked="false" data-val="Villa">Villa</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="budget-input">Maximum Monthly Budget</label>
+                <input type="text" id="budget-input" placeholder="e.g. ₹45,000" value="₹45,000" autocomplete="off" spellcheck="false">
+            </div>
+
+            <div class="form-group">
+                <label for="locality-input">Target Micro-Market</label>
+                <input type="text" id="locality-input" placeholder="e.g. Indiranagar, HSR Layout" autocomplete="off" spellcheck="false">
+            </div>
+
+            <div class="form-group">
+                <label>Strict Parameters</label>
+                <div class="chip-group" id="req-group">
+                    <button class="chip" aria-pressed="false" data-val="Pet Friendly">Pet Friendly</button>
+                    <button class="chip" aria-pressed="false" data-val="Fully Furnished">Fully Furnished</button>
+                    <button class="chip" aria-pressed="false" data-val="Car Parking">Car Parking</button>
+                </div>
+            </div>
+
+            <button class="dispatch-btn" onclick="executeDispatch()">Synthesize Match</button>
+        </aside>
+
+        <!-- Workspace -->
+        <section class="workspace">
+            <h2 class="workspace-title">Outreach Protocol</h2>
+            
+            <div id="empty-state" class="empty-canvas">
+                <div class="empty-line"></div>
+                <p class="empty-text">Awaiting parameters.<br>Configure the client profile to initiate algorithmic partner matching.</p>
+            </div>
+
+            <div id="results">
+                <!-- Injected via JS -->
+            </div>
+        </section>
+    </main>
+
+    <div id="toast" class="toast" aria-live="polite">Payload copied to clipboard</div>
+
+    <script>
+        // Data Core
+        const partnersDb = [
+            { id: "B1", name: "Urban Nest Realty", city: "Bengaluru", perf_score: 4.8, avg_response_mins: 15, accepts_pets: true, configs: ["1BHK", "2BHK", "3BHK"] },
+            { id: "B2", name: "HSR Estates", city: "Bengaluru", perf_score: 4.9, avg_response_mins: 25, accepts_pets: true, configs: ["2BHK", "3BHK", "Villa"] },
+            { id: "B3", name: "QuickKey Prop", city: "Bengaluru", perf_score: 4.5, avg_response_mins: 45, accepts_pets: false, configs: ["1BHK", "2BHK"] },
+            { id: "B4", name: "Premium Living Blr", city: "Bengaluru", perf_score: 4.7, avg_response_mins: 30, accepts_pets: true, configs: ["3BHK", "4BHK+", "Villa"] },
+            { id: "B5", name: "Whitefield Associates", city: "Bengaluru", perf_score: 4.2, avg_response_mins: 120, accepts_pets: true, configs: ["1BHK", "2BHK", "3BHK"] },
+            { id: "P1", name: "Pune Space Makers", city: "Pune", perf_score: 4.7, avg_response_mins: 20, accepts_pets: true, configs: ["1BHK", "2BHK", "3BHK"] },
+            { id: "P2", name: "Koregaon Prime", city: "Pune", perf_score: 4.6, avg_response_mins: 35, accepts_pets: false, configs: ["2BHK", "3BHK", "4BHK+"] },
+            { id: "P3", name: "Viman Nagar Rentals", city: "Pune", perf_score: 4.8, avg_response_mins: 10, accepts_pets: true, configs: ["1BHK", "2BHK"] },
+            { id: "M1", name: "Bandra Homes", city: "Mumbai", perf_score: 4.9, avg_response_mins: 15, accepts_pets: false, configs: ["1BHK", "2BHK", "3BHK"] },
+            { id: "M2", name: "Suburban Key", city: "Mumbai", perf_score: 4.4, avg_response_mins: 60, accepts_pets: true, configs: ["2BHK", "3BHK", "4BHK+"] },
+            { id: "M3", name: "Powai Rentals", city: "Mumbai", perf_score: 4.6, avg_response_mins: 25, accepts_pets: true, configs: ["1BHK", "2BHK"] },
+            { id: "D1", name: "Gurgaon Highrises", city: "Delhi NCR", perf_score: 4.8, avg_response_mins: 20, accepts_pets: true, configs: ["2BHK", "3BHK", "4BHK+"] },
+            { id: "D2", name: "South Delhi Select", city: "Delhi NCR", perf_score: 4.7, avg_response_mins: 40, accepts_pets: false, configs: ["3BHK", "4BHK+", "Villa"] },
+            { id: "H1", name: "Hitech City Homes", city: "Hyderabad", perf_score: 4.9, avg_response_mins: 12, accepts_pets: true, configs: ["2BHK", "3BHK", "Villa"] },
+            { id: "H2", name: "Jubilee Properties", city: "Hyderabad", perf_score: 4.5, avg_response_mins: 45, accepts_pets: false, configs: ["1BHK", "2BHK"] }
+        ];
+
+        // UI Interactions
+        document.querySelectorAll('#config-group .chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('#config-group .chip').forEach(c => {
+                    c.classList.remove('active');
+                    c.setAttribute('aria-checked', 'false');
+                });
+                chip.classList.add('active');
+                chip.setAttribute('aria-checked', 'true');
+            });
+        });
+
+        document.querySelectorAll('#req-group .chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                const isActive = chip.classList.toggle('active');
+                chip.setAttribute('aria-pressed', isActive);
+            });
+        });
+
+        function executeDispatch() {
+            const city = document.getElementById('city-select').value;
+            if (!city) {
+                showToast("Error: Select a destination city");
+                return;
+            }
+            
+            const config = document.querySelector('#config-group .active').getAttribute('data-val');
+            const budget = document.getElementById('budget-input').value || "TBD";
+            const locality = document.getElementById('locality-input').value || "open to suggestions";
+            
+            const reqChips = Array.from(document.querySelectorAll('#req-group .active')).map(c => c.getAttribute('data-val'));
+            const requiresPets = reqChips.includes("Pet Friendly");
+
+            // Filter
+            let matches = partnersDb.filter(p => {
+                if (p.city !== city) return false;
+                if (!p.configs.includes(config)) return false;
+                if (requiresPets && !p.accepts_pets) return false;
+                return true;
+            });
+
+            // Sort
+            matches.sort((a, b) => {
+                if (b.perf_score !== a.perf_score) return b.perf_score - a.perf_score;
+                return a.avg_response_mins - b.avg_response_mins;
+            });
+
+            // Top 3
+            const topMatches = matches.slice(0, 3);
+
+            // Render
+            document.getElementById('empty-state').style.display = 'none';
+            const container = document.getElementById('results');
+            container.style.display = 'grid';
+            container.innerHTML = '';
+
+            if (topMatches.length === 0) {
+                container.innerHTML = `
+                    <div style="grid-column: 1/-1; padding: 40px; border: 1px solid var(--accent-primary); border-radius: 8px; color: white;">
+                        <h3 style="font-family: 'Syne', sans-serif; font-size: 20px; margin-bottom: 8px;">No Viable Partners Found</h3>
+                        <p style="color: var(--text-body);">Expand search parameters. Current criteria yields zero matches in ${city}.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            topMatches.forEach((partner, index) => {
+                const reqString = reqChips.length > 0 ? `\n• Constraints: ${reqChips.join(', ')}` : "";
+                const msgText = `Hi ${partner.name},\n\nNew verified QuickMove lead.\n\n` +
+                                `• Target: ${config} in ${city}\n` +
+                                `• Locality: ${locality}\n` +
+                                `• Budget Cap: ${budget}${reqString}\n\n` +
+                                `Expected SLA: Share listings within ${partner.avg_response_mins + 30} mins.\n` +
+                                `Upload portal: https://qm.link/d/${partner.id}-${Date.now().toString().slice(-4)}`;
+
+                const delay = index * 0.15;
+                const cardHTML = `
+                    <article class="match-card" style="animation-delay: ${delay}s">
+                        <div class="mc-header">
+                            <div class="mc-rank">0${index + 1}</div>
+                            <h3 class="mc-name">${partner.name}</h3>
+                            <div class="mc-metrics">
+                                <div class="metric">
+                                    <span style="color:var(--text-body)">Rating</span>
+                                    <span class="metric-val highlight">${partner.perf_score} / 5.0</span>
+                                </div>
+                                <div class="metric">
+                                    <span style="color:var(--text-body)">Avg TTL</span>
+                                    <span class="metric-val">${partner.avg_response_mins} mins</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mc-body">
+                            <div class="mc-label">Generated Transmission</div>
+                            <div class="mc-message">${msgText}</div>
+                            <button class="copy-btn" onclick="copyText(this)">Copy Transmission</button>
+                        </div>
+                    </article>
+                `;
+                container.innerHTML += cardHTML;
+            });
+        }
+
+        let toastTimeout;
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('visible');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('visible');
+            }, 3000);
+        }
+
+        function copyText(button) {
+            const textToCopy = button.previousElementSibling.innerText;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showToast("Transmission copied to clipboard");
+                
+                const originalText = button.innerHTML;
+                button.innerHTML = 'Copied';
+                button.style.background = 'var(--text-title)';
+                button.style.color = 'var(--bg-base)';
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.style.background = '';
+                    button.style.color = '';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
